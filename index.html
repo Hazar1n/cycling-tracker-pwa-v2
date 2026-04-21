@@ -890,6 +890,13 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 const supabaseClient = window.supabase.createClient(
   'https://baqktcuvnhhjqceamvli.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJhcWt0Y3V2bmhoanFjZWFtdmxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NjY2ODksImV4cCI6MjA5MjM0MjY4OX0.hyeKAwnGIBGaWjD148SekirgenVA-8h3vSZGmm3k-xo'
+ ,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  }
 );
 
 // ─── PROGRAM DATA ───────────────────────────────────────────────────────
@@ -1373,6 +1380,22 @@ function renderChart(logs) {
   });
 }
 
+function showAuth() {
+  document.getElementById('auth').style.display = 'flex'
+  document.getElementById('app').style.display = 'none'
+}
+
+async function initApp(user) {
+  document.getElementById('auth').style.display = 'none'
+  document.getElementById('app').style.display = 'block'
+
+  allLogs = await loadFromSupabase()
+  renderToday()
+  updateProgress()
+  updateStatsHeader()
+  renderLogs()
+}
+
 // ─── TIMER ──────────────────────────────────────────────────────────────
 function timerToggle() {
   if (timerRunning) {
@@ -1428,23 +1451,23 @@ async function logout() {
 }
 
 async function checkUser() {
-  const { data: { user } } = await supabaseClient.auth.getUser();
-  if (user) {
-    document.getElementById('auth').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    allLogs = await loadFromSupabase();
-    renderToday();
-    updateProgress();
-    updateStatsHeader();
-    renderLogs();
+  const { data: { session } } = await supabaseClient.auth.getSession()
+
+  if (session?.user) {
+    initApp(session.user)
   } else {
-    document.getElementById('auth').style.display = 'flex';
-    document.getElementById('app').style.display = 'none';
+    showAuth()
   }
 }
 
 // ─── INIT ────────────────────────────────────────────────────────────────
-supabaseClient.auth.onAuthStateChange(() => checkUser());
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  if (session?.user) {
+    initApp(session.user)
+  } else {
+    showAuth()
+  }
+})
 checkUser();
 </script>
 </body>

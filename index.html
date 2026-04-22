@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="bg">
 <head>
@@ -132,6 +133,7 @@ body::after {
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 14px;
   color: #fff;
+  caret-color: #f97316;
   font-family: 'Barlow', sans-serif;
   font-size: 15px;
   outline: none;
@@ -697,7 +699,15 @@ body::after {
 .empty-state .es-icon { font-size: 40px; margin-bottom: 8px; }
 .empty-state p { font-size: 13px; }
 
-input:-webkit-autofill { -webkit-box-shadow: 0 0 0 100px #0f1624 inset; -webkit-text-fill-color: #fff; }
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 100px #1a2235 inset !important;
+  -webkit-text-fill-color: #fff !important;
+  caret-color: #fff;
+  transition: background-color 9999s ease-in-out 0s;
+}
 button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 </style>
 </head>
@@ -890,13 +900,6 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 const supabaseClient = window.supabase.createClient(
   'https://baqktcuvnhhjqceamvli.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJhcWt0Y3V2bmhoanFjZWFtdmxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NjY2ODksImV4cCI6MjA5MjM0MjY4OX0.hyeKAwnGIBGaWjD148SekirgenVA-8h3vSZGmm3k-xo'
- ,
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false
-    }
-  }
 );
 
 // ─── PROGRAM DATA ───────────────────────────────────────────────────────
@@ -1160,7 +1163,7 @@ async function loadFromSupabase() {
   const { data: { user } } = await supabaseClient.auth.getUser();
   if (!user) return [];
   const { data, error } = await supabaseClient
-    .from('workouts')
+    .from('Workout')
     .select('*')
     .eq('user_id', user.id)
     .order('id', { ascending: true });
@@ -1177,7 +1180,7 @@ async function saveWorkoutLog() {
   const { data: { user } } = await supabaseClient.auth.getUser();
   if (!user) { showToast('⚠️ Трябва да си логнат!'); return; }
 
-  const { error } = await supabaseClient.from('workouts').insert([{
+  const { error } = await supabaseClient.from('Workout').insert([{
     date: new Date().toLocaleDateString('bg-BG'),
     calories,
     weight,
@@ -1201,7 +1204,7 @@ async function saveWorkoutLog() {
 
 async function deleteLog(id) {
   if (!confirm('Изтриване на записа?')) return;
-  await supabaseClient.from('workouts').delete().eq('id', id);
+  await supabaseClient.from('Workout').delete().eq('id', id);
   allLogs = await loadFromSupabase();
   renderLogs();
   updateStatsHeader();
@@ -1380,22 +1383,6 @@ function renderChart(logs) {
   });
 }
 
-function showAuth() {
-  document.getElementById('auth').style.display = 'flex'
-  document.getElementById('app').style.display = 'none'
-}
-
-async function initApp(user) {
-  document.getElementById('auth').style.display = 'none'
-  document.getElementById('app').style.display = 'block'
-
-  allLogs = await loadFromSupabase()
-  renderToday()
-  updateProgress()
-  updateStatsHeader()
-  renderLogs()
-}
-
 // ─── TIMER ──────────────────────────────────────────────────────────────
 function timerToggle() {
   if (timerRunning) {
@@ -1451,23 +1438,23 @@ async function logout() {
 }
 
 async function checkUser() {
-  const { data: { session } } = await supabaseClient.auth.getSession()
-
-  if (session?.user) {
-    initApp(session.user)
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  if (user) {
+    document.getElementById('auth').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    allLogs = await loadFromSupabase();
+    renderToday();
+    updateProgress();
+    updateStatsHeader();
+    renderLogs();
   } else {
-    showAuth()
+    document.getElementById('auth').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
   }
 }
 
 // ─── INIT ────────────────────────────────────────────────────────────────
-supabaseClient.auth.onAuthStateChange((event, session) => {
-  if (session?.user) {
-    initApp(session.user)
-  } else {
-    showAuth()
-  }
-})
+supabaseClient.auth.onAuthStateChange(() => checkUser());
 checkUser();
 </script>
 </body>

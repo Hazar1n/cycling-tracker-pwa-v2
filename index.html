@@ -899,7 +899,15 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 // ─── SUPABASE ───────────────────────────────────────────────────────────
 const supabaseClient = window.supabase.createClient(
   'https://baqktcuvnhhjqceamvli.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJhcWt0Y3V2bmhoanFjZWFtdmxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NjY2ODksImV4cCI6MjA5MjM0MjY4OX0.hyeKAwnGIBGaWjD148SekirgenVA-8h3vSZGmm3k-xo'
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJhcWt0Y3V2bmhoanFjZWFtdmxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NjY2ODksImV4cCI6MjA5MjM0MjY4OX0.hyeKAwnGIBGaWjD148SekirgenVA-8h3vSZGmm3k-xo',
+  {
+    auth: {
+      storageKey: 'cycling-tracker-auth',
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false
+    }
+  }
 );
 
 // ─── PROGRAM DATA ───────────────────────────────────────────────────────
@@ -1427,35 +1435,49 @@ async function login() {
   const password = document.getElementById('password').value;
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) showToast('❌ ' + error.message);
-  else checkUser();
+  // onAuthStateChange handles the rest
 }
 
 async function logout() {
   await supabaseClient.auth.signOut();
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('auth').style.display = 'flex';
   showToast('👋 Излезе успешно');
+  // onAuthStateChange SIGNED_OUT will call showAuth()
 }
 
-async function checkUser() {
-  const { data: { user } } = await supabaseClient.auth.getUser();
-  if (user) {
-    document.getElementById('auth').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    allLogs = await loadFromSupabase();
-    renderToday();
-    updateProgress();
-    updateStatsHeader();
-    renderLogs();
-  } else {
-    document.getElementById('auth').style.display = 'flex';
-    document.getElementById('app').style.display = 'none';
-  }
-}
+// checkUser is replaced by onAuthStateChange → showApp / showAuth
 
 // ─── INIT ────────────────────────────────────────────────────────────────
-supabaseClient.auth.onAuthStateChange(() => checkUser());
-checkUser();
+// Single auth listener — prevents lock conflicts from multiple calls
+let authInitialized = false;
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  // INITIAL_SESSION fires on page load — use it instead of separate checkUser()
+  if (event === 'INITIAL_SESSION') {
+    authInitialized = true;
+    if (session?.user) {
+      showApp(session.user);
+    } else {
+      showAuth();
+    }
+    return;
+  }
+  if (event === 'SIGNED_IN') showApp(session.user);
+  if (event === 'SIGNED_OUT') showAuth();
+});
+
+async function showApp(user) {
+  document.getElementById('auth').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  allLogs = await loadFromSupabase();
+  renderToday();
+  updateProgress();
+  updateStatsHeader();
+  renderLogs();
+}
+
+function showAuth() {
+  document.getElementById('auth').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
 </script>
 </body>
 </html>
